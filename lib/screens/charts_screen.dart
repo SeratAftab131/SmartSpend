@@ -24,7 +24,7 @@ class ChartsScreen extends StatelessWidget {
     final categories = categoryTotals.keys.toList();
     final totals = categoryTotals.values.toList();
 
-    // Define a list of colors (repeats if categories > colors.length)
+    // Define bar colors (repeats if categories > colors.length)
     final List<Color> barColors = [
       Colors.indigo,
       Colors.teal,
@@ -40,8 +40,8 @@ class ChartsScreen extends StatelessWidget {
 
     // Determine max Y and interval for neat spacing
     final double maxY =
-        totals.isEmpty ? 0.0 : totals.reduce((a, b) => a > b ? a : b) * 1.0;
-    final double yInterval = maxY / 10.0; // 5 labels on Y-axis
+        totals.isEmpty ? 0.0 : (totals.reduce((a, b) => a > b ? a : b) * 1.2);
+    final double yInterval = maxY / 5.0; // 5 labels on Y-axis
 
     return Scaffold(
       appBar: AppBar(title: Text('Expenses Chart')),
@@ -89,10 +89,10 @@ class ChartsScreen extends StatelessWidget {
                       x: i,
                       barRods: [
                         BarChartRodData(
-                          toY: totals[i].toDouble(), // cast to double
+                          toY: totals[i].toDouble(),
                           color: barColors[i % barColors.length],
                           width: 20,
-                        )
+                        ),
                       ],
                     );
                   }),

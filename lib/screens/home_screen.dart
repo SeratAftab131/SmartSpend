@@ -7,7 +7,7 @@ import 'charts_screen.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatelessWidget {
-  // Define the same category colors as in ChartsScreen
+  // Category colors
   final Map<String, Color> categoryColors = {
     'Food': Colors.indigo,
     'Transport': Colors.teal,
@@ -17,12 +17,14 @@ class HomeScreen extends StatelessWidget {
     'Other': Colors.blueGrey,
   };
 
-  final double categoryLimit = 100; // budget alert threshold
+  // Budget limit per category
+  final double categoryLimit = 100;
 
   @override
   Widget build(BuildContext context) {
     final box = Hive.box<ExpenseModel>('expenses');
 
+    // Check category totals and send notifications if limit exceeded
     void checkCategoryLimits() {
       final Map<String, double> totals = {};
       for (int i = 0; i < box.length; i++) {
@@ -67,7 +69,7 @@ class HomeScreen extends StatelessWidget {
         builder: (context, Box<ExpenseModel> box, _) {
           if (box.isEmpty) return Center(child: Text('No expenses added yet'));
 
-          // check for category limits whenever expenses change
+          // Check notifications whenever the expenses list updates
           checkCategoryLimits();
 
           return ListView.builder(
@@ -78,9 +80,9 @@ class HomeScreen extends StatelessWidget {
 
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: color,
+                  backgroundColor: color, // category color
                   child: Text(
-                    expense.category[0],
+                    expense.category[0], // first letter of category
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -106,8 +108,7 @@ class HomeScreen extends StatelessWidget {
                           builder: (context) => AlertDialog(
                             title: Text('Delete Expense'),
                             content: Text(
-                              'Are you sure you want to delete "${expense.title}"?',
-                            ),
+                                'Are you sure you want to delete "${expense.title}"?'),
                             actions: [
                               TextButton(
                                 child: Text('Cancel'),
