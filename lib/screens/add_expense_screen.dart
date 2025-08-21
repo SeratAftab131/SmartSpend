@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/expense_model.dart';
+import '../services/notification_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   @override
@@ -35,6 +36,19 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final box = Hive.box<ExpenseModel>('expenses');
       await box.add(expense);
 
+      // Check total spending in this category
+      final total = box.values
+          .where((e) => e.category == _selectedCategory)
+          .fold<double>(0, (sum, e) => sum + e.amount);
+
+      if (total > 100) {
+        await NotificationService.showNotification(
+          title: 'Budget Alert',
+          body:
+              'You have spent \$${total.toStringAsFixed(2)} on $_selectedCategory!',
+        );
+      }
+
       Navigator.pop(context); // return to home
     }
   }
@@ -62,9 +76,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               ),
               DropdownButtonFormField(
                 value: _selectedCategory,
-                items: _categories.map((c) {
-                  return DropdownMenuItem(value: c, child: Text(c));
-                }).toList(),
+                items: _categories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
                 onChanged: (value) =>
                     setState(() => _selectedCategory = value as String),
                 decoration: InputDecoration(labelText: 'Category'),
