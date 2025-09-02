@@ -5,6 +5,8 @@ import '../models/expense_model.dart';
 import 'add_expense_screen.dart';
 import 'charts_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   // Define the same category colors as in ChartsScreen
@@ -49,14 +51,25 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('SmartSpend'),
+        title: const Text('SmartSpend'),
         actions: [
           IconButton(
-            icon: Icon(Icons.pie_chart),
+            icon: const Icon(Icons.pie_chart),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => ChartsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Logout",
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             },
           ),
@@ -65,7 +78,8 @@ class HomeScreen extends StatelessWidget {
       body: ValueListenableBuilder(
         valueListenable: box.listenable(),
         builder: (context, Box<ExpenseModel> box, _) {
-          if (box.isEmpty) return Center(child: Text('No expenses added yet'));
+          if (box.isEmpty)
+            return const Center(child: Text('No expenses added yet'));
 
           // check for category limits whenever expenses change
           checkCategoryLimits();
@@ -81,7 +95,7 @@ class HomeScreen extends StatelessWidget {
                   backgroundColor: color,
                   child: Text(
                     expense.category[0],
-                    style: TextStyle(color: Colors.white),
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 title: Text(expense.title),
@@ -99,18 +113,18 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
+                      icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (context) => AlertDialog(
-                            title: Text('Delete Expense'),
+                            title: const Text('Delete Expense'),
                             content: Text(
                               'Are you sure you want to delete "${expense.title}"?',
                             ),
                             actions: [
                               TextButton(
-                                child: Text('Cancel'),
+                                child: const Text('Cancel'),
                                 onPressed: () =>
                                     Navigator.of(context).pop(false),
                               ),
@@ -118,7 +132,7 @@ class HomeScreen extends StatelessWidget {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red,
                                 ),
-                                child: Text('Delete'),
+                                child: const Text('Delete'),
                                 onPressed: () =>
                                     Navigator.of(context).pop(true),
                               ),
@@ -139,7 +153,7 @@ class HomeScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
         onPressed: () {
           Navigator.push(
             context,

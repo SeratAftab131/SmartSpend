@@ -4,6 +4,7 @@
         android:label="smart_spend"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        android:enableOnBackInvokedCallback="true"
 
         <activity
             android:name=".MainActivity"
