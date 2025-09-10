@@ -10,40 +10,81 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _controller = TextEditingController();
+  final _dailyBudgetController = TextEditingController();
   late Box<SettingsModel> settingsBox;
+  late SettingsModel settings;
+
+  final List<String> _categories = [
+    'Food',
+    'Transport',
+    'Bills',
+    'Shopping',
+    'Health',
+    'Other'
+  ];
 
   @override
   void initState() {
     super.initState();
     settingsBox = Hive.box<SettingsModel>('settings');
 
-    // Load existing budget if set
-    if (settingsBox.isNotEmpty) {
-      final settings = settingsBox.getAt(0);
-      _controller.text = settings?.budgetLimit.toString() ?? "";
+    // Load existing settings or create new ones
+    if (settingsBox.isEmpty) {
+      settings = SettingsModel();
+      settingsBox.add(settings);
+    } else {
+      settings = settingsBox.getAt(0)!;
     }
+
+    _dailyBudgetController.text = settings.dailyBudgetLimit.toStringAsFixed(2);
   }
 
-  void _saveBudget() {
-    if (_formKey.currentState!.validate()) {
-      final limit = double.parse(_controller.text);
+  void _saveSettings() {
+    final dailyLimit = double.tryParse(_dailyBudgetController.text) ??
+        settings.dailyBudgetLimit;
+    settings.dailyBudgetLimit = dailyLimit;
+    settings.save();
 
-      if (settingsBox.isEmpty) {
-        settingsBox.add(SettingsModel(limit));
-      } else {
-        final settings = settingsBox.getAt(0);
-        if (settings != null) {
-          settings.budgetLimit = limit;
-          settings.save();
-        }
-      }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Settings saved")),
+    );
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Budget limit saved")),
-      );
-    }
+  void _showCategoryBudgetDialog(String category, double currentValue) {
+    final controller =
+        TextEditingController(text: currentValue.toStringAsFixed(2));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Set $category Budget'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Amount',
+            prefixText: '\$',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text) ?? currentValue;
+              setState(() {
+                settings.setCategoryLimit(category, value);
+                settings.save();
+              });
+              Navigator.pop(context);
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -52,27 +93,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: const Text("Settings")),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _controller,
-                decoration: const InputDecoration(
-                  labelText: "Daily Budget Limit (\$)",
+        child: ListView(
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Daily Budget Limit",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 12),
+                    TextField(
+                      controller: _dailyBudgetController,
+                      decoration: const InputDecoration(
+                        labelText: "Daily Budget Limit (\$)",
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType:
+                          TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) => value == null || value.isEmpty
-                    ? "Enter a budget limit"
-                    : null,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveBudget,
-                child: const Text("Save"),
+            ),
+            SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Category Budget Limits",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 12),
+                    ..._categories.map((category) {
+                      final limit = settings.getCategoryLimit(category);
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Text(category[0]),
+                        ),
+                        title: Text(category),
+                        subtitle: Text('Limit: \$${limit.toStringAsFixed(2)}'),
+                        trailing: IconButton(
+                          icon: Icon(Icons.edit),
+                          onPressed: () =>
+                              _showCategoryBudgetDialog(category, limit),
+                        ),
+                        onTap: () => _showCategoryBudgetDialog(category, limit),
+                      );
+                    }).toList(),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _saveSettings,
+              child: const Text("Save All Settings"),
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 50),
+              ),
+            ),
+          ],
         ),
       ),
     );

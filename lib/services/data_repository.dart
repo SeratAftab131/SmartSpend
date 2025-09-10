@@ -10,16 +10,14 @@ class DataRepository {
 
   bool _isMigrated = false;
 
-  // Get current user ID
   String? get _userId => _auth.currentUser?.uid;
 
-  // Get expenses stream
   Stream<List<ExpenseModel>> getExpenses() {
     if (_userId != null) {
-      // Migrate data from Hive to Firestore on first login
       if (!_isMigrated) {
-        _migrateHiveToFirestore();
-        _isMigrated = true;
+        _syncCloudToLocalOnFirstLoad().then((_) {
+          _isMigrated = true;
+        });
       }
 
       return _firestore
@@ -28,16 +26,17 @@ class DataRepository {
           .collection('expenses')
           .orderBy('date', descending: true)
           .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) => ExpenseModel.fromFirestore(doc))
-              .toList());
+          .asyncMap((snapshot) async {
+        await syncCloudToLocal();
+        return snapshot.docs
+            .map((doc) => ExpenseModel.fromFirestore(doc))
+            .toList();
+      });
     } else {
-      // Use local Hive data when not logged in
       return _expensesBox.watch().map((_) => _expensesBox.values.toList());
     }
   }
 
-  // Add expense
   Future<void> addExpense(ExpenseModel expense) async {
     if (_userId != null) {
       await _firestore
@@ -50,7 +49,6 @@ class DataRepository {
     }
   }
 
-  // Update expense
   Future<void> updateExpense(ExpenseModel expense) async {
     if (_userId != null && expense.id != null) {
       await _firestore
@@ -64,7 +62,6 @@ class DataRepository {
     }
   }
 
-  // Delete expense
   Future<void> deleteExpense(ExpenseModel expense) async {
     if (_userId != null && expense.id != null) {
       await _firestore
@@ -78,27 +75,57 @@ class DataRepository {
     }
   }
 
-  // Migrate Hive data to Firestore
-  Future<void> _migrateHiveToFirestore() async {
-    final hiveExpenses = _expensesBox.values.toList();
-    if (hiveExpenses.isNotEmpty && _userId != null) {
-      final batch = _firestore.batch();
-      final expensesRef =
-          _firestore.collection('users').doc(_userId).collection('expenses');
+  Future<void> _syncCloudToLocalOnFirstLoad() async {
+    if (_userId != null) {
+      try {
+        final snapshot = await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('expenses')
+            .get();
 
-      for (var expense in hiveExpenses) {
-        final docRef = expensesRef.doc();
-        batch.set(docRef, expense.toMap());
+        if (snapshot.docs.isNotEmpty && _expensesBox.isEmpty) {
+          for (var doc in snapshot.docs) {
+            final expense = ExpenseModel.fromFirestore(doc);
+            await _expensesBox.add(expense);
+          }
+          print(
+              'First-load sync: ${snapshot.docs.length} expenses from cloud to local');
+        }
+      } catch (e) {
+        print('First-load sync error: $e');
       }
-
-      await batch.commit();
-      // Optionally clear Hive data after migration
-      // await _expensesBox.clear();
     }
   }
 
-  // Get category totals (for charts and notifications)
+  Future<void> syncCloudToLocal() async {
+    if (_userId != null) {
+      try {
+        final snapshot = await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('expenses')
+            .get();
+
+        await _expensesBox.clear();
+
+        for (var doc in snapshot.docs) {
+          final expense = ExpenseModel.fromFirestore(doc);
+          await _expensesBox.add(expense);
+        }
+
+        print(
+            'Manual sync: ${snapshot.docs.length} expenses from cloud to local');
+      } catch (e) {
+        print('Sync error: $e');
+        throw e;
+      }
+    }
+  }
+
   Future<Map<String, double>> getCategoryTotals() async {
+    List<ExpenseModel> expenses;
+
     if (_userId != null) {
       final snapshot = await _firestore
           .collection('users')
@@ -106,30 +133,15 @@ class DataRepository {
           .collection('expenses')
           .get();
 
-      final expenses =
+      expenses =
           snapshot.docs.map((doc) => ExpenseModel.fromFirestore(doc)).toList();
-
-      return _calculateCategoryTotals(expenses);
     } else {
-      return _calculateCategoryTotals(_expensesBox.values.toList());
-    }
-  }
-
-  Map<String, double> _calculateCategoryTotals(List<ExpenseModel> expenses) {
-    final Map<String, double> categoryTotals = {};
-
-    for (var expense in expenses) {
-      categoryTotals.update(
-        expense.category,
-        (value) => value + expense.amount,
-        ifAbsent: () => expense.amount,
-      );
+      expenses = _expensesBox.values.toList();
     }
 
-    return categoryTotals;
+    return _calculateCategoryTotals(expenses);
   }
 
-  // Get today's expenses total
   Future<double> getTodayTotal() async {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -154,5 +166,19 @@ class DataRepository {
               expense.date.isBefore(todayStart.add(Duration(days: 1))))
           .fold<double>(0, (sum, expense) => sum + expense.amount);
     }
+  }
+
+  Map<String, double> _calculateCategoryTotals(List<ExpenseModel> expenses) {
+    final Map<String, double> categoryTotals = {};
+
+    for (var expense in expenses) {
+      categoryTotals.update(
+        expense.category,
+        (value) => value + expense.amount,
+        ifAbsent: () => expense.amount,
+      );
+    }
+
+    return categoryTotals;
   }
 }

@@ -12,19 +12,16 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Hive
   await Hive.initFlutter();
   Hive.registerAdapter(ExpenseModelAdapter());
   Hive.registerAdapter(SettingsModelAdapter());
   await Hive.openBox<ExpenseModel>('expenses');
   await Hive.openBox<SettingsModel>('settings');
 
-  // Initialize Notifications
   await NotificationService.initialize();
 
   runApp(const MyApp());
@@ -39,21 +36,38 @@ class MyApp extends StatelessWidget {
       title: 'SmartSpend',
       theme: ThemeData(primarySwatch: Colors.indigo),
       debugShowCheckedModeBanner: false,
-      // Listen for auth changes → show LoginScreen or HomeScreen
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasData) {
-            return HomeScreen();
-          }
-          return const LoginScreen();
-        },
-      ),
+      home: AuthWrapper(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Checking authentication...'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasData) {
+          return HomeScreen();
+        }
+
+        return LoginScreen();
+      },
     );
   }
 }

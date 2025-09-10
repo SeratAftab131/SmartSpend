@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-import 'package:provider/provider.dart';
 import '../models/expense_model.dart';
 import '../models/settings_model.dart';
 import '../services/data_repository.dart';
@@ -41,24 +40,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       await _dataRepository.addExpense(expense);
 
       // Check category budget limit
-      final categoryTotals = await _dataRepository.getCategoryTotals();
-      final categoryTotal = categoryTotals[_selectedCategory] ?? 0;
-
-      // Retrieve budget limit from settings
       final settingsBox = Hive.box<SettingsModel>('settings');
-      final limit = settingsBox.isNotEmpty
-          ? settingsBox.getAt(0)?.budgetLimit ?? 100.0
-          : 100.0;
+      if (settingsBox.isNotEmpty) {
+        final settings = settingsBox.getAt(0)!;
+        final categoryTotals = await _dataRepository.getCategoryTotals();
+        final categoryTotal = categoryTotals[_selectedCategory] ?? 0;
+        final categoryLimit = settings.getCategoryLimit(_selectedCategory);
 
-      if (categoryTotal > limit) {
-        await NotificationService.showNotification(
-          title: 'Budget Alert',
-          body:
-              'You have spent \$${categoryTotal.toStringAsFixed(2)} on $_selectedCategory! (Limit: \$${limit.toStringAsFixed(2)})',
-        );
+        if (categoryTotal >= categoryLimit) {
+          await NotificationService.showNotification(
+            title: 'Category Budget Alert',
+            body:
+                'You have spent \$${categoryTotal.toStringAsFixed(2)} on $_selectedCategory! (Limit: \$${categoryLimit.toStringAsFixed(2)})',
+          );
+        }
       }
 
-      Navigator.pop(context); // return to home
+      Navigator.pop(context);
     }
   }
 

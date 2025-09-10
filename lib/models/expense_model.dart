@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 part 'expense_model.g.dart';
 
@@ -28,6 +29,11 @@ class ExpenseModel extends HiveObject {
     this.id,
   });
 
+  // Get Hive key (for local operations)
+  int? get key {
+    return super.key as int?;
+  }
+
   // Convert to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
@@ -50,14 +56,7 @@ class ExpenseModel extends HiveObject {
     );
   }
 
-  // For Hive compatibility
-  factory ExpenseModel.fromHive(ExpenseModel hiveModel, {String? id}) {
-    return ExpenseModel(
-      title: hiveModel.title,
-      amount: hiveModel.amount,
-      category: hiveModel.category,
-      date: hiveModel.date,
-      id: id,
-    );
+  String get formattedDate {
+    return DateFormat('MMM dd, yyyy').format(date);
   }
 }

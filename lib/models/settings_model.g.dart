@@ -17,16 +17,19 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return SettingsModel(
-      fields[0] as double?,
+      dailyBudgetLimit: fields[0] as double,
+      categoryLimits: (fields[1] as Map?)?.cast<String, double>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(1)
+      ..writeByte(2)
       ..writeByte(0)
-      ..write(obj.budgetLimit);
+      ..write(obj.dailyBudgetLimit)
+      ..writeByte(1)
+      ..write(obj.categoryLimits);
   }
 
   @override
