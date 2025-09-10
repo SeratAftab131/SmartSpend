@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:smartspend/services/notification_service.dart';
 import 'models/expense_model.dart';
+import 'models/settings_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'firebase_options.dart';
@@ -19,7 +20,9 @@ void main() async {
   // Initialize Hive
   await Hive.initFlutter();
   Hive.registerAdapter(ExpenseModelAdapter());
+  Hive.registerAdapter(SettingsModelAdapter());
   await Hive.openBox<ExpenseModel>('expenses');
+  await Hive.openBox<SettingsModel>('settings');
 
   // Initialize Notifications
   await NotificationService.initialize();

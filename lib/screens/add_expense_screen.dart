@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:provider/provider.dart';
 import '../models/expense_model.dart';
+import '../models/settings_model.dart';
+import '../services/data_repository.dart';
 import '../services/notification_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
@@ -12,6 +15,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
+  final DataRepository _dataRepository = DataRepository();
+
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
 
@@ -33,19 +38,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         date: _selectedDate,
       );
 
-      final box = Hive.box<ExpenseModel>('expenses');
-      await box.add(expense);
+      await _dataRepository.addExpense(expense);
 
-      // Check total spending in this category
-      final total = box.values
-          .where((e) => e.category == _selectedCategory)
-          .fold<double>(0, (sum, e) => sum + e.amount);
+      // Check category budget limit
+      final categoryTotals = await _dataRepository.getCategoryTotals();
+      final categoryTotal = categoryTotals[_selectedCategory] ?? 0;
 
-      if (total > 100) {
+      // Retrieve budget limit from settings
+      final settingsBox = Hive.box<SettingsModel>('settings');
+      final limit = settingsBox.isNotEmpty
+          ? settingsBox.getAt(0)?.budgetLimit ?? 100.0
+          : 100.0;
+
+      if (categoryTotal > limit) {
         await NotificationService.showNotification(
           title: 'Budget Alert',
           body:
-              'You have spent \$${total.toStringAsFixed(2)} on $_selectedCategory!',
+              'You have spent \$${categoryTotal.toStringAsFixed(2)} on $_selectedCategory! (Limit: \$${limit.toStringAsFixed(2)})',
         );
       }
 

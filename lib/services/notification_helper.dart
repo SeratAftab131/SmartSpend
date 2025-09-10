@@ -1,22 +1,13 @@
 import 'package:hive/hive.dart';
-import '../models/expense_model.dart';
+import '../models/settings_model.dart';
+import 'data_repository.dart';
 import 'notification_service.dart';
 
 class NotificationHelper {
-  static Future<void> dailySummary() async {
-    final box = Hive.box<ExpenseModel>('expenses');
-    final today = DateTime.now();
-    double totalToday = 0;
+  static final DataRepository _dataRepository = DataRepository();
 
-    for (int i = 0; i < box.length; i++) {
-      final expense = box.getAt(i);
-      if (expense != null &&
-          expense.date.year == today.year &&
-          expense.date.month == today.month &&
-          expense.date.day == today.day) {
-        totalToday += expense.amount;
-      }
-    }
+  static Future<void> dailySummary() async {
+    final totalToday = await _dataRepository.getTodayTotal();
 
     await NotificationService.showNotification(
       title: "Daily Spending Summary",
@@ -24,22 +15,16 @@ class NotificationHelper {
     );
   }
 
-  static Future<void> budgetAlert(double limit) async {
-    final box = Hive.box<ExpenseModel>('expenses');
-    final today = DateTime.now();
-    double totalToday = 0;
+  static Future<void> budgetAlert() async {
+    final settingsBox = Hive.box<SettingsModel>('settings');
+    if (settingsBox.isEmpty) return; // no budget set yet
 
-    for (int i = 0; i < box.length; i++) {
-      final expense = box.getAt(i);
-      if (expense != null &&
-          expense.date.year == today.year &&
-          expense.date.month == today.month &&
-          expense.date.day == today.day) {
-        totalToday += expense.amount;
-      }
-    }
+    final settings = settingsBox.getAt(0); // single entry
+    final double limit = settings?.budgetLimit ?? 0;
 
-    if (totalToday >= limit) {
+    final totalToday = await _dataRepository.getTodayTotal();
+
+    if (limit > 0 && totalToday >= limit) {
       await NotificationService.showNotification(
         title: "Budget Alert",
         body:

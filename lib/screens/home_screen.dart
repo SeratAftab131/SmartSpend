@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:smartspend/services/notification_service.dart';
-import '../models/expense_model.dart';
-import 'add_expense_screen.dart';
-import 'charts_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../models/expense_model.dart';
+import '../services/data_repository.dart';
+import '../services/notification_service.dart';
+import 'add_expense_screen.dart';
+import 'charts_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  // Define the same category colors as in ChartsScreen
+  final DataRepository _dataRepository = DataRepository();
   final Map<String, Color> categoryColors = {
     'Food': Colors.indigo,
     'Transport': Colors.teal,
@@ -19,36 +20,8 @@ class HomeScreen extends StatelessWidget {
     'Other': Colors.blueGrey,
   };
 
-  final double categoryLimit = 100; // budget alert threshold
-
   @override
   Widget build(BuildContext context) {
-    final box = Hive.box<ExpenseModel>('expenses');
-
-    void checkCategoryLimits() {
-      final Map<String, double> totals = {};
-      for (int i = 0; i < box.length; i++) {
-        final expense = box.getAt(i);
-        if (expense != null) {
-          totals.update(
-            expense.category,
-            (value) => value + expense.amount,
-            ifAbsent: () => expense.amount,
-          );
-        }
-      }
-
-      totals.forEach((category, total) {
-        if (total > categoryLimit) {
-          NotificationService.showNotification(
-            title: 'Budget Alert',
-            body:
-                'You have exceeded \$${categoryLimit.toStringAsFixed(2)} in $category.',
-          );
-        }
-      });
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('SmartSpend'),
@@ -75,19 +48,32 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ValueListenableBuilder(
-        valueListenable: box.listenable(),
-        builder: (context, Box<ExpenseModel> box, _) {
-          if (box.isEmpty)
-            return const Center(child: Text('No expenses added yet'));
+      body: StreamBuilder<List<ExpenseModel>>(
+        stream: _dataRepository.getExpenses(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          // check for category limits whenever expenses change
-          checkCategoryLimits();
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final expenses = snapshot.data ?? [];
+
+          if (expenses.isEmpty) {
+            return const Center(child: Text('No expenses added yet'));
+          }
+
+          // Check for category limits
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _checkCategoryLimits(expenses);
+          });
 
           return ListView.builder(
-            itemCount: box.length,
+            itemCount: expenses.length,
             itemBuilder: (context, index) {
-              final expense = box.getAt(index)!;
+              final expense = expenses[index];
               final color = categoryColors[expense.category] ?? Colors.grey;
 
               return ListTile(
@@ -141,7 +127,7 @@ class HomeScreen extends StatelessWidget {
                         );
 
                         if (confirm == true) {
-                          box.deleteAt(index);
+                          _dataRepository.deleteExpense(expense);
                         }
                       },
                     ),
@@ -162,5 +148,28 @@ class HomeScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  void _checkCategoryLimits(List<ExpenseModel> expenses) async {
+    const double categoryLimit = 100; // budget alert threshold
+    final Map<String, double> totals = {};
+
+    for (var expense in expenses) {
+      totals.update(
+        expense.category,
+        (value) => value + expense.amount,
+        ifAbsent: () => expense.amount,
+      );
+    }
+
+    totals.forEach((category, total) {
+      if (total > categoryLimit) {
+        NotificationService.showNotification(
+          title: 'Budget Alert',
+          body:
+              'You have exceeded \$${categoryLimit.toStringAsFixed(2)} in $category.',
+        );
+      }
+    });
   }
 }
